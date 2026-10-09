@@ -1,8 +1,8 @@
 // 対象のAPI URL
 const targetApiUrl = 'https://api.buoy.jp/sakura/table.php?lfourId=1014930';
 
-// 別の安定したCORS回避プロキシ(CodeTabs)を使用します
-const proxyUrl = 'https://api.codetabs.com/v1/proxy?quest=' + targetApiUrl;
+// 別の安定したCORS回避プロキシ(Alloriginsのrawモード)を使用します
+const proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(targetApiUrl);
 
 async function fetchAndDisplayData() {
     const statusText = document.getElementById('status');
