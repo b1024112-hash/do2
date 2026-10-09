@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GPSデータ ダッシュボード</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>📡 ELTRES センサー・GPSダッシュボード</h1>
+        <p id="status">APIからデータを取得・復元しています...</p>
+        
+        <div class="table-container">
+            <table id="data-table">
+                <thead>
+                    <tr>
+                        <th>日時</th>
+                        <th>緯度 (Lat)</th>
+                        <th>経度 (Lng)</th>
+                        <th>値3 (温度等)</th>
+                        <th>標高 (Alt)</th>
+                        <th>RSSI</th>
+                        <th>地図</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- ここにデータが自動生成されます -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
