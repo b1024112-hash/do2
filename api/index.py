@@ -1,7 +1,8 @@
 from fastapi import FastAPI
 from fastapi.responses import PlainTextResponse
-from scraper import fetch_raw_csv_data
-from transformer import transform_to_sensor_data
+# 以下2行の先頭にピリオドを追加して相対インポートにする
+from .scraper import fetch_raw_csv_data
+from .transformer import transform_to_sensor_data
 
 app = FastAPI(title="Buoy Sensor API")
 
