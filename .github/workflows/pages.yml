@@ -1,0 +1,57 @@
+name: Generate and Deploy Data
+
+on:
+  # 自動実行のスケジュール（例: 30分ごと。※UTC時間指定）
+  schedule:
+    - cron: '*/30 * * * *'
+  # 手動で実行するためのボタンを表示
+  workflow_dispatch:
+
+# GitHub Pagesへデプロイするための権限設定
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Generate Data
+        env:
+          API_URL: ${{ secrets.API_URL }}
+        run: |
+          python generate.py
+
+      - name: Setup GitHub Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: './public'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
