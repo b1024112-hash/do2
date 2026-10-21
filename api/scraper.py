@@ -3,7 +3,7 @@ import csv
 from io import StringIO
 
 # 作成した settings.py から API_URL をインポートする
-from settings import API_URL
+from .settings import API_URL
 
 def fetch_raw_csv_data() -> list[dict]:
     """URLからCSVテキストを取得し、辞書のリストとして抽出する"""
