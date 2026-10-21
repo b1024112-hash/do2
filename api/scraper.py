@@ -19,12 +19,17 @@ def fetch_raw_csv_data() -> list[dict]:
         
         # エラー（404など）が返ってきた場合に例外を発生させる
         response.raise_for_status() 
-        
+
     except requests.exceptions.RequestException as e:
-        # タイムアウトやブロックなどでエラーになった場合の処理
-        # ブラウザにエラー内容を表示させるために、エラー文字列を返す（またはログに出す）
-        print(f"Error fetching data: {e}")
-        return [] # もしくはエラーメッセージを含むリストなどを返す
+        # エラーが起きたことをブラウザで確認できるように、ダミーの辞書を返す
+        error_msg = f"API_ERROR: {str(e)}"
+        print(error_msg)
+        return [{
+            "buoy_id": "ERROR",
+            "date": "1970-01-01",
+            "time": "00:00:00",
+            "payload": error_msg.encode('utf-8').hex() # エラーメッセージをhexに変換して強引に表示させる
+        }]
     
     # 取得したテキストデータをCSVとして読み込む
     f = StringIO(response.text)
