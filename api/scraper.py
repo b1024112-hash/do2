@@ -8,9 +8,23 @@ from .settings import API_URL
 def fetch_raw_csv_data() -> list[dict]:
     """URLからCSVテキストを取得し、辞書のリストとして抽出する"""
     
-    # 直書きではなく、settings からインポートした変数を使う
-    response = requests.get(API_URL, timeout = 10)
-    response.raise_for_status()
+    # 1. 偽装用のヘッダー情報を定義する
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    }
+    
+    try:
+        # 2. 修正したコード（ヘッダーとタイムアウト10秒を指定）に置き換える
+        response = requests.get(API_URL, headers=headers, timeout=10)
+        
+        # エラー（404など）が返ってきた場合に例外を発生させる
+        response.raise_for_status() 
+        
+    except requests.exceptions.RequestException as e:
+        # タイムアウトやブロックなどでエラーになった場合の処理
+        # ブラウザにエラー内容を表示させるために、エラー文字列を返す（またはログに出す）
+        print(f"Error fetching data: {e}")
+        return [] # もしくはエラーメッセージを含むリストなどを返す
     
     # 取得したテキストデータをCSVとして読み込む
     f = StringIO(response.text)
