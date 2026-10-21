@@ -1,0 +1,18 @@
+[project]
+name = "do2-api"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Shun4211", email = "170243861+Shun4211@users.noreply.github.com" }
+]
+requires-python = ">=3.14"
+dependencies = [
+    "fastapi[standard]>=0.142.2",
+    "python-dotenv>=1.2.4",
+    "requests>=2.34.2",
+    "uvicorn[standard]>=0.54.0",
+]
+
+[tool.uv]
+package = false

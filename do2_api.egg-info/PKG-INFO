@@ -1,0 +1,9 @@
+Metadata-Version: 2.4
+Name: do2-api
+Version: 0.1.0
+Summary: Add your description here
+Author-email: Shun4211 <170243861+Shun4211@users.noreply.github.com>
+Requires-Python: >=3.14
+Description-Content-Type: text/markdown
+Requires-Dist: fastapi[standard]>=0.142.2
+Requires-Dist: uvicorn[standard]>=0.54.0
