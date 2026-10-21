@@ -40,7 +40,7 @@ jobs:
 
       - name: Generate Data
         env:
-          API_URL: ${{ secrets.API_URL }}
+          DO2_API_URL: ${{ secrets.DO2_API_URL }}
         run: |
           python generate.py
 
