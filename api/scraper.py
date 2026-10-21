@@ -9,7 +9,7 @@ def fetch_raw_csv_data() -> list[dict]:
     """URLからCSVテキストを取得し、辞書のリストとして抽出する"""
     
     # 直書きではなく、settings からインポートした変数を使う
-    response = requests.get(API_URL)
+    response = requests.get(API_URL, timeout = 10)
     response.raise_for_status()
     
     # 取得したテキストデータをCSVとして読み込む
