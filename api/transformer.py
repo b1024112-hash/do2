@@ -16,6 +16,18 @@ def calculate_do_mg_l(temp_c: float, do_saturation: float) -> float:
     except Exception:
         return None
 
+def is_valid_coordinate(lat, lon) -> bool:
+    """緯度経度が数値かつ0以外で正常な範囲にあるかチェック"""
+    if lat is None or lon is None:
+        return False
+    try:
+        lat_f, lon_f = float(lat), float(lon)
+        if lat_f == 0.0 or lon_f == 0.0:
+            return False
+        return (-90 <= lat_f <= 90) and (-180 <= lon_f <= 180)
+    except (ValueError, TypeError):
+        return False
+
 def decode_payload(hex_str: str) -> dict:
     """16進数ペイロードをデコードする"""
     result = {
@@ -85,23 +97,22 @@ def decode_payload(hex_str: str) -> dict:
 def convert_to_jst(date_str: str, time_str: str) -> str:
     """UTC（Z）のタイムスタンプを日本時間（JST / UTC+9）に変換する"""
     try:
-        # "2026-10-09", "06:30:02" のような文字列を結合してパース
         dt_utc = datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H:%M:%S")
         dt_utc = dt_utc.replace(tzinfo=timezone.utc)
         
-        # 9時間を足して日本時間（JST）にする
         jst_timezone = timezone(timedelta(hours=9))
         dt_jst = dt_utc.astimezone(jst_timezone)
         
-        # "2026-10-09T15:30:02+09:00" の形式で返す
         return dt_jst.strftime("%Y-%m-%d %H:%M:%S")
     except Exception:
-        # パースに失敗した場合はそのまま返す
         return f"{date_str} {time_str}"
 
 def transform_to_sensor_data(raw_data: list[dict]) -> list[str]:
     """デコードした結果をカンマ区切りの文字列（日本時間表示）に変換する"""
     formatted_lines = []
+    
+    # ブイごとの直近の正常な位置情報を記録する辞書
+    last_known_locations = {}
     
     for item in raw_data:
         buoy_id = item.get('buoy_id', '')
@@ -115,8 +126,17 @@ def transform_to_sensor_data(raw_data: list[dict]) -> list[str]:
         # デコード実行
         decoded = decode_payload(payload)
         
-        lat = decoded["latitude"] if decoded["latitude"] is not None else ""
-        lon = decoded["longitude"] if decoded["longitude"] is not None else ""
+        lat = decoded["latitude"]
+        lon = decoded["longitude"]
+        
+        # 正常な緯度経度がある場合は記憶を更新、無い場合は直前のデータから引き継ぐ
+        if is_valid_coordinate(lat, lon):
+            last_known_locations[buoy_id] = (lat, lon)
+        elif buoy_id in last_known_locations:
+            lat, lon = last_known_locations[buoy_id]
+        else:
+            lat, lon = "", ""
+        
         temp = decoded["temperature"] if decoded["temperature"] is not None else ""
         do_sat = decoded["do_saturation"] if decoded["do_saturation"] is not None else ""
         do_mg = decoded["do_mg_l"] if decoded["do_mg_l"] is not None else ""
