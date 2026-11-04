@@ -1,5 +1,6 @@
 import struct
 import math
+import re
 from datetime import datetime, timezone, timedelta
 
 def calculate_do_mg_l(temp_c: float, do_saturation: float) -> float:
@@ -16,7 +17,7 @@ def calculate_do_mg_l(temp_c: float, do_saturation: float) -> float:
         return None
 
 def decode_payload(hex_str: str) -> dict:
-    """16進数ペイロードをデコードする"""
+    """16進数ペイロードをデコードする（テキスト形式・バイナリ形式両対応）"""
     result = {
         "latitude": None,
         "longitude": None,
@@ -25,14 +26,26 @@ def decode_payload(hex_str: str) -> dict:
         "do_mg_l": None,
         "text_data": None
     }
+    
     try:
         payload_bytes = bytes.fromhex(hex_str)
         decoded_text = payload_bytes.decode('utf-8', errors='ignore').rstrip('\x00')
+
+        # 1. まずテキスト形式 "水温,DO飽和度" (例: "18.89,97.59") かどうかを厳密に判定
+        # ^-?\d+(?:\.\d+)? : 整数または小数の数値
+        text_match = re.match(r"^(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)$", decoded_text)
         
-        if "STAT:" in decoded_text or ("," in decoded_text and not hex_str.startswith(("3e", "3d", "3c", "3b", "3a", "39", "38", "37", "36", "35", "34", "33", "32", "31", "30"))):
-            result["text_data"] = decoded_text
+        if text_match:
+            temp = float(text_match.group(1))
+            do_sat = float(text_match.group(2))
+            
+            result["temperature"] = temp
+            result["do_saturation"] = do_sat
+            result["do_mg_l"] = calculate_do_mg_l(temp, do_sat)
+            # CSV出力時にテキストとして出力されないよう text_data はセットしない、もしくは別途扱う
             return result
 
+        # 2. テキスト形式でなければ、バイナリ形式 (float x 4) としてパースを試みる
         if len(payload_bytes) >= 16:
             try:
                 unpacked = struct.unpack('<ffff', payload_bytes[:16])
@@ -41,6 +54,7 @@ def decode_payload(hex_str: str) -> dict:
                 temp = round(unpacked[2], 2)
                 do_sat = round(unpacked[3], 2)
 
+                # 値が現実的なセンサーデータの範囲内かチェック (ゴミデータとの切り分け)
                 if -100 <= temp <= 60 and -200 <= do_sat <= 500:
                     if lat > 1000:
                         deg_lat = int(lat / 100)
@@ -56,11 +70,15 @@ def decode_payload(hex_str: str) -> dict:
                     
                     if temp > -100 and do_sat > -100:
                         result["do_mg_l"] = calculate_do_mg_l(temp, do_sat)
+                    
                     return result
             except Exception:
                 pass
 
-        result["text_data"] = decoded_text
+        # 3. どちらの形式にも当てはまらない場合 (STAT:等のログ文字列)
+        if "STAT:" in decoded_text or "," in decoded_text:
+            result["text_data"] = decoded_text
+
     except Exception:
         pass
         
@@ -69,18 +87,14 @@ def decode_payload(hex_str: str) -> dict:
 def convert_to_jst(date_str: str, time_str: str) -> str:
     """UTC（Z）のタイムスタンプを日本時間（JST / UTC+9）に変換する"""
     try:
-        # "2026-10-09", "06:30:02" のような文字列を結合してパース
         dt_utc = datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H:%M:%S")
         dt_utc = dt_utc.replace(tzinfo=timezone.utc)
         
-        # 9時間を足して日本時間（JST）にする
         jst_timezone = timezone(timedelta(hours=9))
         dt_jst = dt_utc.astimezone(jst_timezone)
         
-        # "2026-10-09T15:30:02+09:00" の形式で返す
         return dt_jst.strftime("%Y-%m-%d %H:%M:%S")
     except Exception:
-        # パースに失敗した場合はそのまま返す
         return f"{date_str} {time_str}"
 
 def transform_to_sensor_data(raw_data: list[dict]) -> list[str]:
@@ -93,10 +107,7 @@ def transform_to_sensor_data(raw_data: list[dict]) -> list[str]:
         time = item.get('time', '')
         payload = item.get('payload', '')
         
-        # タイムスタンプを日本時間（JST）に変換
         jst_datetime_str = convert_to_jst(date, time)
-        
-        # デコード実行
         decoded = decode_payload(payload)
         
         lat = decoded["latitude"] if decoded["latitude"] is not None else ""
@@ -106,6 +117,8 @@ def transform_to_sensor_data(raw_data: list[dict]) -> list[str]:
         do_mg = decoded["do_mg_l"] if decoded["do_mg_l"] is not None else ""
         text = decoded["text_data"] if decoded["text_data"] is not None else ""
         
+        # テキストデータ（STATなど）が入っている場合はそれを出力し、
+        # そうでない場合は水温やDOなどの数値データをカンマ区切りで出力する
         if text:
             line = f"{buoy_id},{jst_datetime_str},{text}"
         else:
@@ -114,3 +127,5 @@ def transform_to_sensor_data(raw_data: list[dict]) -> list[str]:
         formatted_lines.append(line)
         
     return formatted_lines
+
+        print(line)
