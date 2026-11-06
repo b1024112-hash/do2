@@ -43,4 +43,96 @@ def decode_payload(hex_str: str) -> dict:
         decoded_text = payload_bytes.decode('utf-8', errors='ignore').rstrip('\x00')
         
         # 1. まずテキスト形式 "水温,DO飽和度" (例: "18.89,97.59") かどうかを厳密に判定
-        text_match = re
+        text_match = re.match(r"^(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)$", decoded_text)
+        if text_match:
+            temp = float(text_match.group(1))
+            do_sat = float(text_match.group(2))
+            
+            result["temperature"] = temp
+            result["do_saturation"] = do_sat
+            result["do_mg_l"] = calculate_do_mg_l(temp, do_sat)
+            return result
+
+        # 2. バイナリ(float x4)としてデコードを試みる
+        if len(payload_bytes) >= 16:
+            try:
+                unpacked = struct.unpack('<ffff', payload_bytes[:16])
+                lat = round(unpacked[0], 6)
+                lon = round(unpacked[1], 6)
+                temp = round(unpacked[2], 2)
+                do_sat = round(unpacked[3], 2)
+
+                # 値が現実的なセンサーデータの範囲内かチェック (ゴミデータとの切り分け)
+                if -100 <= temp <= 60 and -200 <= do_sat <= 500:
+                    if lat > 1000:
+                        deg_lat = int(lat / 100)
+                        lat = round(deg_lat + ((lat - (deg_lat * 100)) / 60), 6)
+                    if lon > 1000:
+                        deg_lon = int(lon / 100)
+                        lon = round(deg_lon + ((lon - (deg_lon * 100)) / 60), 6)
+
+                    result["latitude"] = lat
+                    result["longitude"] = lon
+                    result["temperature"] = temp
+                    result["do_saturation"] = do_sat
+                    
+                    if temp > -100 and do_sat > -100:
+                        result["do_mg_l"] = calculate_do_mg_l(temp, do_sat)
+                    
+                    # センサーデータとして正常ならここで返す（テキスト判定には進まない）
+                    return result
+            except Exception:
+                pass
+
+        # 3. floatとして解釈できなかった(または範囲外だった)場合のみテキストとして判定する
+        if "STAT:" in decoded_text or "," in decoded_text:
+            result["text_data"] = decoded_text
+
+    except Exception:
+        pass
+        
+    return result
+
+def transform_to_sensor_data(raw_data: list[dict]) -> list[str]:
+    """デコードした結果をカンマ区切りの文字列に変換する"""
+    formatted_lines = []
+    
+    # ブイごとの直近の正常な位置情報を記録する辞書
+    last_known_locations = {}
+    
+    for item in raw_data:
+        buoy_id = item.get('buoy_id', '')
+        date = item.get('date', '')
+        time = item.get('time', '')
+        payload = item.get('payload', '')
+        
+        # タイムスタンプをそのまま結合
+        datetime_str = f"{date} {time}".strip()
+        
+        # デコード実行
+        decoded = decode_payload(payload)
+        
+        lat = decoded["latitude"]
+        lon = decoded["longitude"]
+        
+        # 正常な緯度経度がある場合は記憶を更新、無い場合は直前のデータから引き継ぐ
+        if is_valid_coordinate(lat, lon):
+            last_known_locations[buoy_id] = (lat, lon)
+        elif buoy_id in last_known_locations:
+            lat, lon = last_known_locations[buoy_id]
+        else:
+            lat, lon = "", ""
+        
+        temp = decoded["temperature"] if decoded["temperature"] is not None else ""
+        do_sat = decoded["do_saturation"] if decoded["do_saturation"] is not None else ""
+        do_mg = decoded["do_mg_l"] if decoded["do_mg_l"] is not None else ""
+        text = decoded["text_data"] if decoded["text_data"] is not None else ""
+        
+        if text:
+            line = f"{buoy_id},{datetime_str},{text}"
+        else:
+            line = f"{buoy_id},{datetime_str},{lat},{lon},{temp},{do_sat},{do_mg}"
+            
+        formatted_lines.append(line)
+        
+    return formatted_lines
