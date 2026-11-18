@@ -2,16 +2,32 @@ import struct
 import math
 import re
 
-def calculate_do_mg_l(temp_c: float, do_saturation: float) -> float:
-    """温度とDO飽和度から溶存酸素量(mg/L)を計算する"""
+def calculate_do_mg_l(temp_c: Optional[float], do_saturation: Optional[float]) -> Optional[float]:
+    """温度とDO飽和度から溶存酸素量(mg/L)を計算する（JFEアドバンテック式 / 塩分34.0固定）"""
     if temp_c is None or do_saturation is None:
         return None
     try:
-        T_k = temp_c + 273.15
-        ln_Cstar = -139.34411 + (1.575701e5 / T_k) - (6.642308e7 / (T_k**2)) + (1.243800e10 / (T_k**3)) - (8.621949e11 / (T_k**4))
-        do_sat_ml_l = math.exp(ln_Cstar)
-        do_sat_mg_l = do_sat_ml_l * 1.42905
-        return round(do_sat_mg_l * (do_saturation / 100.0), 2)
+        Ts = 273.15 + temp_c
+        S = 34.0  # 塩分は固定値
+
+        A1 = -173.4292
+        A2 = 249.6339
+        A3 = 143.3483
+        A4 = -21.8492
+        B1 = -0.033096
+        B2 = 0.014259
+        B3 = -0.0017
+
+        ln_o2_star = (
+            A1
+            + A2 * (100.0 / Ts)
+            + A3 * math.log(Ts / 100.0)
+            + A4 * (Ts / 100.0)
+            + S * (B1 + B2 * (Ts / 100.0) + B3 * ((Ts / 100.0) ** 2))
+        )
+        o2_star = math.exp(ln_o2_star)
+        do_mg_l = (do_saturation / 100.0) * o2_star * 1.42903
+        return round(do_mg_l, 2)
     except Exception:
         return None
 
